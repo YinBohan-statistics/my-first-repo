@@ -46,6 +46,7 @@ let animationId = null;
 let feedbackTimer = null;
 let audioContext = null;
 let userPausedMusic = false;
+let lastFrameTime = null;
 
 function startGame() {
   bullets = [];
@@ -54,6 +55,7 @@ function startGame() {
   gameOver = false;
   shootCooldown = 0;
   enemyTimer = 0;
+  lastFrameTime = null;
   player.x = canvas.width / 2 - player.width / 2;
 
   scoreElement.textContent = score;
@@ -66,8 +68,10 @@ function startGame() {
   gameLoop();
 }
 
-function gameLoop() {
-  updateGame();
+function gameLoop(currentTime = 0) {
+  const speedScale = getSpeedScale(currentTime);
+
+  updateGame(speedScale);
   drawGame();
 
   if (!gameOver) {
@@ -75,19 +79,31 @@ function gameLoop() {
   }
 }
 
-function updateGame() {
-  updateStars();
-  movePlayer();
-  shootBullet();
-  moveBullets();
-  createEnemies();
-  moveEnemies();
+function getSpeedScale(currentTime) {
+  if (lastFrameTime === null) {
+    lastFrameTime = currentTime;
+    return 1;
+  }
+
+  const frameTime = currentTime - lastFrameTime;
+  lastFrameTime = currentTime;
+
+  return Math.min(Math.max(frameTime / 16.67, 0.5), 2);
+}
+
+function updateGame(speedScale) {
+  updateStars(speedScale);
+  movePlayer(speedScale);
+  shootBullet(speedScale);
+  moveBullets(speedScale);
+  createEnemies(speedScale);
+  moveEnemies(speedScale);
   checkCollisions();
 }
 
-function updateStars() {
+function updateStars(speedScale) {
   stars.forEach((star) => {
-    star.y += star.speed;
+    star.y += star.speed * speedScale;
 
     if (star.y > canvas.height) {
       star.y = 0;
@@ -96,13 +112,13 @@ function updateStars() {
   });
 }
 
-function movePlayer() {
+function movePlayer(speedScale) {
   if (keys.left) {
-    player.x -= player.speed;
+    player.x -= player.speed * speedScale;
   }
 
   if (keys.right) {
-    player.x += player.speed;
+    player.x += player.speed * speedScale;
   }
 
   if (player.x < 0) {
@@ -114,9 +130,9 @@ function movePlayer() {
   }
 }
 
-function shootBullet() {
+function shootBullet(speedScale) {
   if (shootCooldown > 0) {
-    shootCooldown -= 1;
+    shootCooldown -= speedScale;
     return;
   }
 
@@ -132,17 +148,17 @@ function shootBullet() {
   shootCooldown = 18;
 }
 
-function moveBullets() {
+function moveBullets(speedScale) {
   bullets.forEach((bullet) => {
-    bullet.y -= bullet.speed;
+    bullet.y -= bullet.speed * speedScale;
   });
 
   bullets = bullets.filter((bullet) => bullet.y + bullet.height > 0);
 }
 
-function createEnemies() {
+function createEnemies(speedScale) {
   const enemyInterval = Math.max(34, 82 - Math.floor(score / 5) * 4);
-  enemyTimer += 1;
+  enemyTimer += speedScale;
 
   if (enemyTimer < enemyInterval) {
     return;
@@ -162,9 +178,9 @@ function createEnemies() {
   enemyTimer = 0;
 }
 
-function moveEnemies() {
+function moveEnemies(speedScale) {
   enemies.forEach((enemy) => {
-    enemy.y += enemy.speed;
+    enemy.y += enemy.speed * speedScale;
   });
 }
 
