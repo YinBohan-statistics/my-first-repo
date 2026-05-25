@@ -1,2 +1,0 @@
-This is an about file.
-I am learning GitHub branches.
