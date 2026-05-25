@@ -156,7 +156,7 @@ function createEnemies() {
     y: -enemyHeight,
     width: enemyWidth,
     height: enemyHeight,
-    speed: 1.45 + Math.random() * 0.9 + score * 0.01
+    speed: 1.8 + Math.random() * 1.05 + score * 0.012
   });
 
   enemyTimer = 0;
