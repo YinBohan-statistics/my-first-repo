@@ -26,8 +26,7 @@ const player = {
 
 const keys = {
   left: false,
-  right: false,
-  shoot: false
+  right: false
 };
 
 const stars = Array.from({ length: 45 }, () => ({
@@ -118,9 +117,6 @@ function movePlayer() {
 function shootBullet() {
   if (shootCooldown > 0) {
     shootCooldown -= 1;
-  }
-
-  if (!keys.shoot || shootCooldown > 0) {
     return;
   }
 
@@ -133,7 +129,7 @@ function shootBullet() {
   });
 
   playShootSound();
-  shootCooldown = 15;
+  shootCooldown = 18;
 }
 
 function moveBullets() {
@@ -145,7 +141,7 @@ function moveBullets() {
 }
 
 function createEnemies() {
-  const enemyInterval = Math.max(28, 70 - Math.floor(score / 5) * 4);
+  const enemyInterval = Math.max(34, 82 - Math.floor(score / 5) * 4);
   enemyTimer += 1;
 
   if (enemyTimer < enemyInterval) {
@@ -160,7 +156,7 @@ function createEnemies() {
     y: -enemyHeight,
     width: enemyWidth,
     height: enemyHeight,
-    speed: 2.1 + Math.random() * 1.4 + score * 0.015
+    speed: 1.45 + Math.random() * 0.9 + score * 0.01
   });
 
   enemyTimer = 0;
@@ -301,6 +297,38 @@ function isColliding(a, b) {
   );
 }
 
+function movePlayerToClientX(clientX) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const canvasX = (clientX - rect.left) * scaleX;
+
+  player.x = canvasX - player.width / 2;
+
+  if (player.x < 0) {
+    player.x = 0;
+  }
+
+  if (player.x + player.width > canvas.width) {
+    player.x = canvas.width - player.width;
+  }
+}
+
+function handlePointerControl(event) {
+  if (event.pointerType === "mouse") {
+    return;
+  }
+
+  event.preventDefault();
+  prepareAudio();
+
+  if (event.type === "pointerdown" && canvas.setPointerCapture) {
+    canvas.setPointerCapture(event.pointerId);
+  }
+
+  movePlayerToClientX(event.clientX);
+  tryPlayMusicAfterInteraction(event);
+}
+
 function endGame() {
   gameOver = true;
   finalScoreElement.textContent = score;
@@ -401,17 +429,13 @@ function drawEnemy(enemy) {
 
 document.addEventListener("keydown", (event) => {
   if (event.code === "ArrowLeft") {
+    prepareAudio();
     keys.left = true;
   }
 
   if (event.code === "ArrowRight") {
-    keys.right = true;
-  }
-
-  if (event.code === "Space") {
-    event.preventDefault();
     prepareAudio();
-    keys.shoot = true;
+    keys.right = true;
   }
 });
 
@@ -422,10 +446,6 @@ document.addEventListener("keyup", (event) => {
 
   if (event.code === "ArrowRight") {
     keys.right = false;
-  }
-
-  if (event.code === "Space") {
-    keys.shoot = false;
   }
 });
 
@@ -452,6 +472,8 @@ musicBtn.addEventListener("click", async () => {
 
 document.addEventListener("keydown", tryPlayMusicAfterInteraction);
 document.addEventListener("pointerdown", tryPlayMusicAfterInteraction);
+canvas.addEventListener("pointerdown", handlePointerControl);
+canvas.addEventListener("pointermove", handlePointerControl);
 
 startGame();
 tryPlayMusic();
