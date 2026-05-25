@@ -30,6 +30,12 @@ body {
   margin-bottom: 12px;
 }
 
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 h1 {
   margin: 0;
   font-size: 24px;
@@ -43,6 +49,21 @@ h1 {
   color: #ffffff;
   background: #2563eb;
   border-radius: 6px;
+}
+
+.music-btn {
+  cursor: pointer;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  background: #475569;
+}
+
+.music-btn:hover {
+  background: #334155;
 }
 
 .canvas-wrap {
@@ -147,5 +168,10 @@ canvas {
   .top-bar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .top-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 }

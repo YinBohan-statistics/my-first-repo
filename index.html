@@ -12,8 +12,13 @@
     <section class="game-panel">
       <header class="top-bar">
         <h1>殷神飞机赛</h1>
-        <div class="score-box">分数：<span id="score">0</span></div>
+        <div class="top-actions">
+          <div class="score-box">分数：<span id="score">0</span></div>
+          <button id="musicBtn" class="music-btn" type="button" aria-pressed="true">暂停音乐</button>
+        </div>
       </header>
+
+      <audio id="bgm" src="bgm.mp3" loop autoplay preload="auto"></audio>
 
       <div class="canvas-wrap">
         <canvas id="gameCanvas" width="480" height="640" aria-label="殷神飞机赛画布"></canvas>

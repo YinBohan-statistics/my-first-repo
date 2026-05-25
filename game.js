@@ -4,8 +4,15 @@ const ctx = canvas.getContext("2d");
 const scoreElement = document.getElementById("score");
 const finalScoreElement = document.getElementById("finalScore");
 const feedbackElement = document.getElementById("feedback");
+const bgm = document.getElementById("bgm");
+const musicBtn = document.getElementById("musicBtn");
 const gameOverPanel = document.getElementById("gameOverPanel");
 const restartBtn = document.getElementById("restartBtn");
+
+const feedbackMessages = [
+  "你跑不过我你信吗？",
+  "张雪峰老师，我还记得你。"
+];
 
 const player = {
   x: canvas.width / 2 - 22,
@@ -36,6 +43,7 @@ let shootCooldown = 0;
 let enemyTimer = 0;
 let animationId = null;
 let feedbackTimer = null;
+let audioContext = null;
 
 function startGame() {
   bullets = [];
@@ -121,6 +129,7 @@ function shootBullet() {
     speed: 9
   });
 
+  playShootSound();
   shootCooldown = 15;
 }
 
@@ -188,13 +197,81 @@ function checkCollisions() {
 }
 
 function showFeedback() {
-  feedbackElement.textContent = `太强了！${score} 分`;
+  const message = feedbackMessages[Math.floor(Math.random() * feedbackMessages.length)];
+  feedbackElement.textContent = `${message} ${score} 分`;
   feedbackElement.classList.remove("hidden");
 
   clearTimeout(feedbackTimer);
   feedbackTimer = setTimeout(() => {
     feedbackElement.classList.add("hidden");
   }, 900);
+}
+
+function getAudioContext() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+
+  if (!AudioContextClass) {
+    return null;
+  }
+
+  if (!audioContext) {
+    audioContext = new AudioContextClass();
+  }
+
+  return audioContext;
+}
+
+function prepareAudio() {
+  const context = getAudioContext();
+
+  if (context && context.state === "suspended") {
+    context.resume();
+  }
+}
+
+function playShootSound() {
+  const context = getAudioContext();
+
+  if (!context) {
+    return;
+  }
+
+  const now = context.currentTime;
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(900, now);
+  oscillator.frequency.exponentialRampToValueAtTime(180, now + 0.12);
+
+  gain.gain.setValueAtTime(0.14, now);
+  gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start(now);
+  oscillator.stop(now + 0.13);
+}
+
+function updateMusicButton() {
+  if (bgm.paused) {
+    musicBtn.textContent = "播放音乐";
+    musicBtn.setAttribute("aria-pressed", "false");
+    return;
+  }
+
+  musicBtn.textContent = "暂停音乐";
+  musicBtn.setAttribute("aria-pressed", "true");
+}
+
+async function tryPlayMusic() {
+  try {
+    await bgm.play();
+  } catch (error) {
+    // Some browsers block autoplay until the player interacts with the page.
+  }
+
+  updateMusicButton();
 }
 
 function isColliding(a, b) {
@@ -288,6 +365,7 @@ document.addEventListener("keydown", (event) => {
 
   if (event.code === "Space") {
     event.preventDefault();
+    prepareAudio();
     keys.shoot = true;
   }
 });
@@ -308,4 +386,21 @@ document.addEventListener("keyup", (event) => {
 
 restartBtn.addEventListener("click", startGame);
 
+musicBtn.addEventListener("click", async () => {
+  if (bgm.paused) {
+    try {
+      await bgm.play();
+    } catch (error) {
+      updateMusicButton();
+    }
+
+    updateMusicButton();
+    return;
+  }
+
+  bgm.pause();
+  updateMusicButton();
+});
+
 startGame();
+tryPlayMusic();
