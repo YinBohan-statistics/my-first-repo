@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>打飞机小游戏</title>
+  <title>殷神飞机赛</title>
   <link rel="stylesheet" href="style.css">
   <script src="game.js" defer></script>
 </head>
@@ -11,12 +11,13 @@
   <main class="page">
     <section class="game-panel">
       <header class="top-bar">
-        <h1>打飞机小游戏</h1>
+        <h1>殷神飞机赛</h1>
         <div class="score-box">分数：<span id="score">0</span></div>
       </header>
 
       <div class="canvas-wrap">
-        <canvas id="gameCanvas" width="480" height="640" aria-label="打飞机小游戏画布"></canvas>
+        <canvas id="gameCanvas" width="480" height="640" aria-label="殷神飞机赛画布"></canvas>
+        <div id="feedback" class="feedback hidden">太强了！</div>
 
         <div id="gameOverPanel" class="overlay hidden">
           <h2>游戏结束</h2>

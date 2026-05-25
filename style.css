@@ -60,6 +60,38 @@ canvas {
   border-radius: 8px;
 }
 
+.feedback {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+  background: #f59e0b;
+  border-radius: 6px;
+  pointer-events: none;
+  animation: feedback-pop 0.9s ease forwards;
+}
+
+@keyframes feedback-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 12px) scale(0.9);
+  }
+
+  25% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.05);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -12px) scale(1);
+  }
+}
+
 .overlay {
   position: absolute;
   inset: 0;

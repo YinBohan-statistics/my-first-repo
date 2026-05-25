@@ -3,6 +3,7 @@ const ctx = canvas.getContext("2d");
 
 const scoreElement = document.getElementById("score");
 const finalScoreElement = document.getElementById("finalScore");
+const feedbackElement = document.getElementById("feedback");
 const gameOverPanel = document.getElementById("gameOverPanel");
 const restartBtn = document.getElementById("restartBtn");
 
@@ -34,6 +35,7 @@ let gameOver = false;
 let shootCooldown = 0;
 let enemyTimer = 0;
 let animationId = null;
+let feedbackTimer = null;
 
 function startGame() {
   bullets = [];
@@ -46,7 +48,9 @@ function startGame() {
 
   scoreElement.textContent = score;
   finalScoreElement.textContent = score;
+  feedbackElement.classList.add("hidden");
   gameOverPanel.classList.add("hidden");
+  clearTimeout(feedbackTimer);
 
   cancelAnimationFrame(animationId);
   gameLoop();
@@ -172,10 +176,25 @@ function checkCollisions() {
         bullets.splice(bulletIndex, 1);
         score += 1;
         scoreElement.textContent = score;
+
+        if (score % 10 === 0) {
+          showFeedback();
+        }
+
         break;
       }
     }
   }
+}
+
+function showFeedback() {
+  feedbackElement.textContent = `太强了！${score} 分`;
+  feedbackElement.classList.remove("hidden");
+
+  clearTimeout(feedbackTimer);
+  feedbackTimer = setTimeout(() => {
+    feedbackElement.classList.add("hidden");
+  }, 900);
 }
 
 function isColliding(a, b) {
