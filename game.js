@@ -11,7 +11,9 @@ const restartBtn = document.getElementById("restartBtn");
 
 const feedbackMessages = [
   "你跑不过我你信吗？",
-  "张雪峰老师，我还记得你。"
+  "张雪峰老师，我还记得你。",
+  "你一定能考上",
+  "我给大家表演一个三口吃巧乐兹。"
 ];
 
 const player = {
@@ -19,7 +21,7 @@ const player = {
   y: canvas.height - 72,
   width: 44,
   height: 54,
-  speed: 6
+  speed: 4
 };
 
 const keys = {
@@ -44,6 +46,7 @@ let enemyTimer = 0;
 let animationId = null;
 let feedbackTimer = null;
 let audioContext = null;
+let userPausedMusic = false;
 
 function startGame() {
   bullets = [];
@@ -149,13 +152,14 @@ function createEnemies() {
     return;
   }
 
-  const size = 38;
+  const enemyWidth = 36;
+  const enemyHeight = 58;
 
   enemies.push({
-    x: Math.random() * (canvas.width - size),
-    y: -size,
-    width: size,
-    height: size,
+    x: Math.random() * (canvas.width - enemyWidth),
+    y: -enemyHeight,
+    width: enemyWidth,
+    height: enemyHeight,
     speed: 2.1 + Math.random() * 1.4 + score * 0.015
   });
 
@@ -204,7 +208,7 @@ function showFeedback() {
   clearTimeout(feedbackTimer);
   feedbackTimer = setTimeout(() => {
     feedbackElement.classList.add("hidden");
-  }, 900);
+  }, 2200);
 }
 
 function getAudioContext() {
@@ -265,6 +269,10 @@ function updateMusicButton() {
 }
 
 async function tryPlayMusic() {
+  if (userPausedMusic) {
+    return;
+  }
+
   try {
     await bgm.play();
   } catch (error) {
@@ -272,6 +280,16 @@ async function tryPlayMusic() {
   }
 
   updateMusicButton();
+}
+
+function tryPlayMusicAfterInteraction(event) {
+  if (event.target === musicBtn) {
+    return;
+  }
+
+  if (bgm.paused) {
+    tryPlayMusic();
+  }
 }
 
 function isColliding(a, b) {
@@ -339,17 +357,44 @@ function drawEnemy(enemy) {
   ctx.save();
   ctx.translate(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
 
-  ctx.fillStyle = "#fb7185";
+  const bodyWidth = enemy.width;
+  const bodyHeight = enemy.height - 14;
+  const bodyX = -bodyWidth / 2;
+  const bodyY = -enemy.height / 2;
+  const stickWidth = 8;
+  const radius = 9;
+
+  ctx.fillStyle = "#d6a15f";
+  ctx.fillRect(-stickWidth / 2, bodyY + bodyHeight - 2, stickWidth, 16);
+
+  ctx.fillStyle = "#5b2d1d";
   ctx.beginPath();
-  ctx.moveTo(0, enemy.height / 2);
-  ctx.lineTo(enemy.width / 2, -enemy.height / 2 + 8);
-  ctx.lineTo(0, -enemy.height / 2 + 16);
-  ctx.lineTo(-enemy.width / 2, -enemy.height / 2 + 8);
+  ctx.moveTo(bodyX + radius, bodyY);
+  ctx.lineTo(bodyX + bodyWidth - radius, bodyY);
+  ctx.quadraticCurveTo(bodyX + bodyWidth, bodyY, bodyX + bodyWidth, bodyY + radius);
+  ctx.lineTo(bodyX + bodyWidth, bodyY + bodyHeight);
+  ctx.lineTo(bodyX, bodyY + bodyHeight);
+  ctx.lineTo(bodyX, bodyY + radius);
+  ctx.quadraticCurveTo(bodyX, bodyY, bodyX + radius, bodyY);
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = "#fecdd3";
-  ctx.fillRect(-4, -6, 8, 18);
+  ctx.fillStyle = "#f8e6b8";
+  ctx.fillRect(bodyX + 7, bodyY + 6, 6, bodyHeight - 10);
+
+  ctx.strokeStyle = "#f2c94c";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(bodyX + 19, bodyY + 10);
+  ctx.lineTo(bodyX + bodyWidth - 7, bodyY + 20);
+  ctx.lineTo(bodyX + 18, bodyY + 32);
+  ctx.lineTo(bodyX + bodyWidth - 8, bodyY + 40);
+  ctx.stroke();
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 10px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("巧", 0, bodyY + 29);
 
   ctx.restore();
 }
@@ -388,6 +433,8 @@ restartBtn.addEventListener("click", startGame);
 
 musicBtn.addEventListener("click", async () => {
   if (bgm.paused) {
+    userPausedMusic = false;
+
     try {
       await bgm.play();
     } catch (error) {
@@ -398,9 +445,13 @@ musicBtn.addEventListener("click", async () => {
     return;
   }
 
+  userPausedMusic = true;
   bgm.pause();
   updateMusicButton();
 });
+
+document.addEventListener("keydown", tryPlayMusicAfterInteraction);
+document.addEventListener("pointerdown", tryPlayMusicAfterInteraction);
 
 startGame();
 tryPlayMusic();

@@ -86,14 +86,16 @@ canvas {
   top: 18px;
   left: 50%;
   transform: translateX(-50%);
+  max-width: calc(100% - 32px);
   padding: 8px 14px;
   color: #ffffff;
   font-size: 18px;
   font-weight: 700;
+  text-align: center;
   background: #f59e0b;
   border-radius: 6px;
   pointer-events: none;
-  animation: feedback-pop 0.9s ease forwards;
+  animation: feedback-pop 2.2s ease forwards;
 }
 
 @keyframes feedback-pop {
@@ -105,6 +107,11 @@ canvas {
   25% {
     opacity: 1;
     transform: translate(-50%, 0) scale(1.05);
+  }
+
+  82% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
   }
 
   100% {
