@@ -13,7 +13,7 @@ body {
 .page {
   min-height: 100vh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 24px;
 }
@@ -33,12 +33,16 @@ body {
 .top-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 10px;
 }
 
 h1 {
+  flex: 0 0 auto;
   margin: 0;
   font-size: 24px;
+  white-space: nowrap;
 }
 
 .score-box {
@@ -51,6 +55,21 @@ h1 {
   border-radius: 6px;
 }
 
+.stat-box {
+  min-width: 84px;
+  padding: 8px 10px;
+  text-align: center;
+  font-weight: 700;
+  color: #ffffff;
+  background: #be123c;
+  border-radius: 6px;
+}
+
+.stat-box + .stat-box {
+  background: #7c3aed;
+}
+
+.control-btn,
 .music-btn {
   cursor: pointer;
   border: 0;
@@ -62,8 +81,14 @@ h1 {
   background: #475569;
 }
 
+.control-btn:hover,
 .music-btn:hover {
   background: #334155;
+}
+
+.control-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .canvas-wrap {
@@ -100,6 +125,22 @@ canvas {
   animation: feedback-pop 2.2s ease forwards;
 }
 
+.debug-panel {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  max-width: calc(100% - 24px);
+  padding: 8px 10px;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  background: rgba(250, 204, 21, 0.92);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
 @keyframes feedback-pop {
   0% {
     opacity: 0;
@@ -130,7 +171,9 @@ canvas {
   align-items: center;
   justify-content: center;
   gap: 12px;
+  padding: 24px;
   color: #ffffff;
+  text-align: center;
   background: rgba(15, 23, 42, 0.82);
   border-radius: 8px;
 }
@@ -159,6 +202,23 @@ canvas {
   background: #15803d;
 }
 
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  color: #374151;
+  font-size: 14px;
+}
+
+.status-row span {
+  min-width: 0;
+}
+
+.status-row strong {
+  color: #111827;
+}
+
 .hidden {
   display: none;
 }
@@ -182,5 +242,14 @@ canvas {
   .top-actions {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .top-actions > * {
+    flex: 1 1 calc(50% - 10px);
+  }
+
+  .status-row {
+    flex-direction: column;
+    gap: 4px;
   }
 }
