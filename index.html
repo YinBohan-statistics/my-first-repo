@@ -14,7 +14,7 @@
         <h1>殷神飞机赛</h1>
         <div class="top-actions">
           <div class="score-box">分数：<span id="score">0</span></div>
-          <div class="stat-box">生命：<span id="lives">2</span></div>
+          <div class="stat-box">生命：<span id="lives">3</span></div>
           <div class="stat-box">最高：<span id="bestScore">0</span></div>
           <button id="pauseBtn" class="control-btn" type="button" disabled>暂停</button>
           <button id="musicBtn" class="music-btn" type="button" aria-pressed="true">暂停音乐</button>
@@ -39,9 +39,30 @@
           <button id="resumeBtn" type="button">继续</button>
         </div>
 
+        <div id="revivePanel" class="overlay hidden">
+          <h2>最后一题</h2>
+          <p>殷神__ __!</p>
+          <form id="reviveForm" class="revive-form">
+            <input id="reviveAnswer" type="text" autocomplete="off" maxlength="8" aria-label="复活填空答案">
+            <button type="submit">提交</button>
+          </form>
+          <p id="reviveError" class="revive-error hidden">答错了，游戏结束。</p>
+        </div>
+
+        <div id="clearPanel" class="overlay hidden">
+          <h2>通关</h2>
+          <p>孩子你考上小学博士了！</p>
+          <p>当前分数：<span id="clearScore">300</span></p>
+          <div class="overlay-actions">
+            <button id="continueChallengeBtn" type="button">继续挑战</button>
+            <button id="finishGameBtn" class="secondary-btn" type="button">结束游戏</button>
+          </div>
+        </div>
+
         <div id="gameOverPanel" class="overlay hidden">
           <h2>游戏结束</h2>
           <p>最终分数：<span id="finalScore">0</span></p>
+          <p>最终评级：<span id="finalRating">中专</span></p>
           <p>历史最高：<span id="finalBestScore">0</span></p>
           <button id="restartBtn" type="button">重新开始</button>
         </div>

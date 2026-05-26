@@ -7,6 +7,7 @@ const elements = {
   bestScore: document.getElementById("bestScore"),
   startBestScore: document.getElementById("startBestScore"),
   finalScore: document.getElementById("finalScore"),
+  finalRating: document.getElementById("finalRating"),
   finalBestScore: document.getElementById("finalBestScore"),
   feedback: document.getElementById("feedback"),
   bgm: document.getElementById("bgm"),
@@ -17,6 +18,14 @@ const elements = {
   restartBtn: document.getElementById("restartBtn"),
   startPanel: document.getElementById("startPanel"),
   pausePanel: document.getElementById("pausePanel"),
+  revivePanel: document.getElementById("revivePanel"),
+  reviveForm: document.getElementById("reviveForm"),
+  reviveAnswer: document.getElementById("reviveAnswer"),
+  reviveError: document.getElementById("reviveError"),
+  clearPanel: document.getElementById("clearPanel"),
+  clearScore: document.getElementById("clearScore"),
+  continueChallengeBtn: document.getElementById("continueChallengeBtn"),
+  finishGameBtn: document.getElementById("finishGameBtn"),
   gameOverPanel: document.getElementById("gameOverPanel"),
   powerupStatus: document.getElementById("powerupStatus"),
   stageLabel: document.getElementById("stageLabel"),
@@ -33,18 +42,21 @@ const CONFIG = {
     width: 44,
     height: 54,
     speed: 4,
-    lives: 2,
+    lives: 3,
     lifeCooldown: 90,
     invincibleTime: 90
   },
   bullet: {
     width: 6,
     height: 16,
-    bigWidth: 12,
-    bigHeight: 24,
+    maxWidth: 18,
+    maxHeight: 36,
+    maxLevel: 6,
     speed: 9,
     cooldown: 18,
-    doubleOffset: 11
+    laneGap: 13,
+    lanePadding: 6,
+    maxLanes: 5
   },
   enemies: {
     baseInterval: 82,
@@ -86,22 +98,66 @@ const CONFIG = {
   },
   powerups: {
     dropSpeed: 2.1,
-    size: 26,
-    bigDuration: 560,
-    doubleDuration: 620
+    size: 26
   },
   boss: {
     firstScore: 45,
     scoreStep: 55,
     width: 150,
     height: 82,
-    baseHp: 48,
-    hpStep: 18,
+    baseHp: 80,
+    hpStep: 90,
     speed: 2,
     y: 48,
     score: 15,
     attackInterval: 74
   },
+  bossTypes: [
+    {
+      name: "张老师的跑步机",
+      subtitle: "越跑越上岸",
+      color: "#4c1d95",
+      accent: "#fbbf24",
+      hp: 80,
+      hpScale: 1,
+      speedScale: 1,
+      attackInterval: 78,
+      attack: "treadmill"
+    },
+    {
+      name: "张老师的雪碧",
+      subtitle: "气泡压迫感",
+      color: "#047857",
+      accent: "#a7f3d0",
+      hp: 170,
+      hpScale: 1,
+      speedScale: 1.08,
+      attackInterval: 64,
+      attack: "sprite"
+    },
+    {
+      name: "张老师的夜宵",
+      subtitle: "深夜加餐局",
+      color: "#7c2d12",
+      accent: "#fdba74",
+      hp: 290,
+      hpScale: 1,
+      speedScale: 1.16,
+      attackInterval: 58,
+      attack: "snack"
+    },
+    {
+      name: "张老师的最后一卷",
+      subtitle: "压轴大题",
+      color: "#7f1d1d",
+      accent: "#fecaca",
+      hp: 460,
+      hpScale: 1,
+      speedScale: 1.28,
+      attackInterval: 48,
+      attack: "paper"
+    }
+  ],
   feedbackDuration: 2200,
   debug: {
     enabled:
@@ -160,15 +216,24 @@ const state = {
   audioContext: null,
   userPausedMusic: readBoolean(CONFIG.storage.musicPaused, false),
   showHitboxes: false,
+  reviveAvailable: true,
+  hasCleared: false,
+  bossIndex: 0,
   boss: null,
   bullets: [],
   enemies: [],
   powerups: [],
+  bossProjectiles: [],
   particles: [],
   floatingTexts: [],
-  powerupTimers: {
-    big: 0,
-    double: 0
+  bossIntro: {
+    timer: 0,
+    level: 0,
+    color: "#fbbf24"
+  },
+  weapon: {
+    lanes: 1,
+    bulletLevel: 0
   },
   shake: {
     time: 0,
@@ -220,6 +285,7 @@ function resetGameState() {
   state.score = 0;
   state.lives = CONFIG.player.lives;
   state.nextBossScore = CONFIG.boss.firstScore;
+  state.bossIndex = 0;
   state.shootCooldown = 0;
   state.enemyTimer = 0;
   state.lifeCooldown = 0;
@@ -228,10 +294,15 @@ function resetGameState() {
   state.bullets = [];
   state.enemies = [];
   state.powerups = [];
+  state.bossProjectiles = [];
   state.particles = [];
   state.floatingTexts = [];
-  state.powerupTimers.big = 0;
-  state.powerupTimers.double = 0;
+  state.bossIntro.timer = 0;
+  state.bossIntro.level = 0;
+  state.weapon.lanes = 1;
+  state.weapon.bulletLevel = 0;
+  state.reviveAvailable = true;
+  state.hasCleared = false;
   state.shake.time = 0;
   state.shake.strength = 0;
   player.x = canvas.width / 2 - player.width / 2;
@@ -239,6 +310,8 @@ function resetGameState() {
 
   clearTimeout(state.feedbackTimer);
   elements.feedback.classList.add("hidden");
+  elements.reviveAnswer.value = "";
+  elements.reviveError.classList.add("hidden");
   updateUI();
 }
 
@@ -265,7 +338,7 @@ function gameLoop(currentTime = 0) {
 
   if (state.phase === "playing") {
     updateGame(speedScale);
-  } else if (state.phase === "gameover") {
+  } else if (state.phase === "revive" || state.phase === "clear" || state.phase === "gameover") {
     updateEffects(speedScale);
   }
 
@@ -292,6 +365,7 @@ function updateGame(speedScale) {
   shootBullets(speedScale);
   moveBullets(speedScale);
   updateBoss(speedScale);
+  moveBossProjectiles(speedScale);
   createEnemies(speedScale);
   moveEnemies(speedScale);
   updatePowerups(speedScale);
@@ -303,8 +377,7 @@ function updateGame(speedScale) {
 function updateTimers(speedScale) {
   state.lifeCooldown = Math.max(0, state.lifeCooldown - speedScale);
   player.invincibleTimer = Math.max(0, player.invincibleTimer - speedScale);
-  state.powerupTimers.big = Math.max(0, state.powerupTimers.big - speedScale);
-  state.powerupTimers.double = Math.max(0, state.powerupTimers.double - speedScale);
+  state.bossIntro.timer = Math.max(0, state.bossIntro.timer - speedScale);
 
   state.enemies.forEach((enemy) => {
     enemy.hitFlash = Math.max(0, enemy.hitFlash - speedScale);
@@ -344,27 +417,41 @@ function shootBullets(speedScale) {
     return;
   }
 
-  const isBig = state.powerupTimers.big > 0;
-  const isDouble = state.powerupTimers.double > 0;
-  const width = isBig ? CONFIG.bullet.bigWidth : CONFIG.bullet.width;
-  const height = isBig ? CONFIG.bullet.bigHeight : CONFIG.bullet.height;
-  const damage = isBig ? 2 : 1;
-  const offsets = isDouble ? [-CONFIG.bullet.doubleOffset, CONFIG.bullet.doubleOffset] : [0];
+  const bulletStats = getBulletStats();
+  const offsets = getLaneOffsets(bulletStats.width);
 
   offsets.forEach((offset) => {
     state.bullets.push({
-      x: player.x + player.width / 2 - width / 2 + offset,
-      y: player.y - height + 2,
-      width,
-      height,
+      x: player.x + player.width / 2 - bulletStats.width / 2 + offset,
+      y: player.y - bulletStats.height + 2,
+      width: bulletStats.width,
+      height: bulletStats.height,
       speed: CONFIG.bullet.speed,
-      damage,
-      big: isBig
+      damage: bulletStats.damage,
+      level: state.weapon.bulletLevel
     });
   });
 
   playSound("shoot");
   state.shootCooldown = CONFIG.bullet.cooldown;
+}
+
+function getBulletStats() {
+  const level = state.weapon.bulletLevel;
+
+  return {
+    width: Math.min(CONFIG.bullet.width + level * 2, CONFIG.bullet.maxWidth),
+    height: Math.min(CONFIG.bullet.height + level * 3, CONFIG.bullet.maxHeight),
+    damage: 1 + Math.floor(level / 2)
+  };
+}
+
+function getLaneOffsets(bulletWidth = CONFIG.bullet.width) {
+  const lanes = state.weapon.lanes;
+  const center = (lanes - 1) / 2;
+  const laneGap = Math.max(CONFIG.bullet.laneGap, bulletWidth + CONFIG.bullet.lanePadding);
+
+  return Array.from({ length: lanes }, (_, index) => (index - center) * laneGap);
 }
 
 function moveBullets(speedScale) {
@@ -468,21 +555,38 @@ function updateBoss(speedScale) {
   boss.y += (boss.targetY - boss.y) * 0.06 * speedScale;
   boss.x += boss.speed * boss.direction * speedScale;
 
+  if (boss.attack === "sprite") {
+    boss.y += Math.sin(boss.attackTimer * 0.04) * 0.45 * speedScale;
+  }
+
+  if (boss.attack === "paper") {
+    boss.x += Math.sin(boss.attackTimer * 0.08) * 1.1 * speedScale;
+  }
+
   if (boss.x <= 16 || boss.x + boss.width >= canvas.width - 16) {
     boss.direction *= -1;
     boss.x = clamp(boss.x, 16, canvas.width - boss.width - 16);
   }
 
+  if (boss.introTimer > 0) {
+    boss.introTimer -= speedScale;
+    boss.attackTimer = 0;
+    return;
+  }
+
   boss.attackTimer += speedScale;
 
-  if (boss.attackTimer >= CONFIG.boss.attackInterval) {
-    spawnBossMinion();
+  if (boss.attackTimer >= boss.attackInterval) {
+    runBossAttack(boss);
     boss.attackTimer = 0;
   }
 }
 
 function spawnBoss() {
-  const bossLevel = Math.floor(state.nextBossScore / CONFIG.boss.scoreStep);
+  const bossTypeIndex = Math.min(state.bossIndex, CONFIG.bossTypes.length - 1);
+  const bossType = CONFIG.bossTypes[bossTypeIndex];
+  const overflowLevel = Math.max(0, state.bossIndex - bossTypeIndex);
+  const maxHp = Math.round((bossType.hp + overflowLevel * CONFIG.boss.hpStep) * bossType.hpScale);
 
   state.boss = {
     x: canvas.width / 2 - CONFIG.boss.width / 2,
@@ -490,27 +594,64 @@ function spawnBoss() {
     targetY: CONFIG.boss.y,
     width: CONFIG.boss.width,
     height: CONFIG.boss.height,
-    hp: CONFIG.boss.baseHp + bossLevel * CONFIG.boss.hpStep,
-    maxHp: CONFIG.boss.baseHp + bossLevel * CONFIG.boss.hpStep,
-    speed: CONFIG.boss.speed + bossLevel * 0.15,
+    hp: maxHp,
+    maxHp,
+    speed: (CONFIG.boss.speed + state.bossIndex * 0.12) * bossType.speedScale,
     direction: Math.random() > 0.5 ? 1 : -1,
+    name: bossType.name,
+    subtitle: bossType.subtitle,
+    color: bossType.color,
+    accent: bossType.accent,
+    attack: bossType.attack,
+    level: bossTypeIndex + 1 + overflowLevel,
+    attackInterval: Math.max(34, bossType.attackInterval - overflowLevel * 4),
     attackTimer: 0,
+    introTimer: 95 + bossTypeIndex * 20,
     hitFlash: 0
   };
 
   state.enemies = [];
   state.bullets = [];
-  addShake(18, 5);
-  showFeedback(bossQuotes[Math.floor(Math.random() * bossQuotes.length)]);
+  state.bossProjectiles = [];
+  state.bossIntro.timer = state.boss.introTimer;
+  state.bossIntro.level = state.boss.level;
+  state.bossIntro.color = state.boss.accent;
+  addBossIntroBurst(state.boss);
+  addShake(18 + bossTypeIndex * 8, 5 + bossTypeIndex * 2);
+  showFeedback(`${bossType.name}：${bossQuotes[Math.floor(Math.random() * bossQuotes.length)]}`);
   playSound("boss");
 }
 
-function spawnBossMinion() {
+function runBossAttack(boss) {
+  if (boss.attack === "treadmill") {
+    spawnBossMinion(Math.random() > 0.55 ? "drift" : "normal");
+    return;
+  }
+
+  if (boss.attack === "sprite") {
+    spawnBossProjectileFan(boss, 3, 2.7, "泡");
+    return;
+  }
+
+  if (boss.attack === "snack") {
+    spawnBossMinion(Math.random() > 0.45 ? "tank" : "drift");
+    spawnBossProjectileFan(boss, 3, 2.45, "宵");
+    return;
+  }
+
+  spawnBossProjectileFan(boss, 5, 3.1, "卷");
+
+  if (Math.random() > 0.46) {
+    spawnBossMinion(Math.random() > 0.55 ? "tank" : "drift");
+  }
+}
+
+function spawnBossMinion(forcedType = null) {
   if (!state.boss) {
     return;
   }
 
-  const type = Math.random() > 0.62 ? "drift" : "normal";
+  const type = forcedType ?? (Math.random() > 0.62 ? "drift" : "normal");
   const minion = createEnemy(type, {
     x: state.boss.x + state.boss.width / 2 - CONFIG.enemyTypes[type].width / 2 + randomBetween(-36, 36),
     y: state.boss.y + state.boss.height - 8
@@ -518,6 +659,53 @@ function spawnBossMinion() {
 
   minion.speed += 0.55;
   state.enemies.push(minion);
+}
+
+function spawnBossProjectileFan(boss, count, speed, label) {
+  const centerX = boss.x + boss.width / 2;
+  const startY = boss.y + boss.height - 6;
+  const center = (count - 1) / 2;
+
+  for (let index = 0; index < count; index += 1) {
+    const offset = index - center;
+    const size = label === "卷" ? 24 : 20;
+
+    state.bossProjectiles.push({
+      x: centerX - size / 2 + offset * 18,
+      y: startY,
+      width: size,
+      height: size,
+      vx: offset * 0.55,
+      vy: speed + Math.abs(offset) * 0.1,
+      color: boss.accent,
+      label,
+      spin: 0,
+      damage: 1
+    });
+  }
+}
+
+function moveBossProjectiles(speedScale) {
+  state.bossProjectiles.forEach((projectile) => {
+    projectile.x += projectile.vx * speedScale;
+    projectile.y += projectile.vy * speedScale;
+    projectile.spin += 0.08 * speedScale;
+  });
+
+  state.bossProjectiles = state.bossProjectiles.filter(
+    (projectile) =>
+      projectile.y < canvas.height + projectile.height &&
+      projectile.x + projectile.width > -24 &&
+      projectile.x < canvas.width + 24
+  );
+}
+
+function addBossIntroBurst(boss) {
+  const cx = boss.x + boss.width / 2;
+  const cy = CONFIG.boss.y + boss.height / 2;
+  const count = 18 + boss.level * 10;
+
+  addParticles(cx, cy, boss.accent, count);
 }
 
 function updatePowerups(speedScale) {
@@ -553,6 +741,7 @@ function updateEffects(speedScale) {
 function checkCollisions() {
   checkEnemyCollisions();
   checkBossCollisions();
+  checkBossProjectileCollisions();
   checkPowerupCollisions();
 }
 
@@ -582,7 +771,7 @@ function checkEnemyCollisions() {
       state.bullets.splice(bulletIndex, 1);
       enemy.hp -= bullet.damage;
       enemy.hitFlash = 8;
-      addParticles(bullet.x + bullet.width / 2, bullet.y, bullet.big ? "#fef3c7" : "#facc15", 5);
+      addParticles(bullet.x + bullet.width / 2, bullet.y, bullet.level > 0 ? "#fef3c7" : "#facc15", 5);
       playSound("hit");
 
       if (enemy.hp <= 0) {
@@ -623,6 +812,20 @@ function checkBossCollisions() {
   }
 }
 
+function checkBossProjectileCollisions() {
+  for (let index = state.bossProjectiles.length - 1; index >= 0; index -= 1) {
+    const projectile = state.bossProjectiles[index];
+
+    if (!isColliding(projectile, player)) {
+      continue;
+    }
+
+    state.bossProjectiles.splice(index, 1);
+    addParticles(projectile.x + projectile.width / 2, projectile.y + projectile.height / 2, projectile.color, 10);
+    loseLife("被 Boss 考到了");
+  }
+}
+
 function checkPowerupCollisions() {
   for (let index = state.powerups.length - 1; index >= 0; index -= 1) {
     const powerup = state.powerups[index];
@@ -652,16 +855,49 @@ function destroyEnemy(enemyIndex, enemy) {
 
 function defeatBoss() {
   const boss = state.boss;
+  const reward = CONFIG.boss.score + boss.level * 5;
+  const clearedFinalBoss = !state.hasCleared && state.bossIndex >= CONFIG.bossTypes.length - 1;
 
-  state.score += CONFIG.boss.score;
+  state.score += reward;
   state.nextBossScore += CONFIG.boss.scoreStep;
+  state.bossIndex += 1;
   addParticles(boss.x + boss.width / 2, boss.y + boss.height / 2, "#f97316", 32);
-  addFloatingText(`+${CONFIG.boss.score}`, boss.x + boss.width / 2, boss.y + boss.height / 2, "#f97316");
+  addFloatingText(`+${reward}`, boss.x + boss.width / 2, boss.y + boss.height / 2, "#f97316");
   addShake(24, 7);
-  spawnPowerup("double", boss.x + boss.width / 2, boss.y + boss.height / 2);
+  spawnPowerup(state.weapon.lanes < CONFIG.bullet.maxLanes ? "double" : "big", boss.x + boss.width / 2, boss.y + boss.height / 2);
+  state.bossProjectiles = [];
   state.boss = null;
+
+  if (clearedFinalBoss) {
+    completeGame();
+    return;
+  }
+
   showFeedback("这波上岸了，继续冲！");
   playSound("bossDown");
+}
+
+function completeGame() {
+  state.hasCleared = true;
+  state.score = Math.max(state.score, 300);
+  state.nextBossScore = state.score + CONFIG.boss.scoreStep;
+  state.bestScore = Math.max(state.bestScore, state.score);
+  saveValue(CONFIG.storage.bestScore, state.bestScore);
+  addShake(36, 9);
+  showFeedback("孩子你考上小学博士了！");
+  playSound("bossDown");
+  updateUI();
+  setPhase("clear");
+}
+
+function continueChallenge() {
+  state.lastFrameTime = null;
+  showFeedback("继续挑战，看看小学博士后面是什么。");
+  setPhase("playing");
+}
+
+function finishGame() {
+  endGame();
 }
 
 function addScoreFeedback(enemy) {
@@ -706,16 +942,26 @@ function spawnPowerup(type, x, y) {
 
 function applyPowerup(type) {
   if (type === "big") {
-    state.powerupTimers.big = CONFIG.powerups.bigDuration;
-    showFeedback("大子弹来了！");
+    if (state.weapon.bulletLevel < CONFIG.bullet.maxLevel) {
+      state.weapon.bulletLevel += 1;
+      showFeedback(`子弹变大 Lv.${state.weapon.bulletLevel}`);
+    } else {
+      state.score += 2;
+      showFeedback("子弹已经够大了，转成 2 分！");
+    }
   }
 
   if (type === "double") {
-    state.powerupTimers.double = CONFIG.powerups.doubleDuration;
-    showFeedback("双发火力！");
+    if (state.weapon.lanes < CONFIG.bullet.maxLanes) {
+      state.weapon.lanes += 1;
+      showFeedback(`新增弹道：${state.weapon.lanes} 条`);
+    } else {
+      state.score += 2;
+      showFeedback("弹道已经满了，转成 2 分！");
+    }
   }
 
-  addFloatingText(type === "big" ? "大子弹" : "双发", player.x + player.width / 2, player.y, "#22c55e");
+  addFloatingText(type === "big" ? "子弹变大" : "弹道+1", player.x + player.width / 2, player.y, "#22c55e");
   playSound("pickup");
 }
 
@@ -732,11 +978,61 @@ function loseLife(reason) {
   playSound("damage");
 
   if (state.lives <= 0) {
-    endGame();
+    requestRevive();
     return;
   }
 
   showFeedback(`${reason}，还剩 ${state.lives} 条命`);
+}
+
+function requestRevive() {
+  if (!state.reviveAvailable) {
+    endGame();
+    return;
+  }
+
+  state.reviveAvailable = false;
+  state.bossProjectiles = [];
+  setPhase("revive");
+  showFeedback("最后一题，答对就还能抢救一下！");
+  playSound("gameOver");
+
+  setTimeout(() => {
+    elements.reviveAnswer.focus();
+  }, 0);
+}
+
+function submitReviveAnswer(event) {
+  event.preventDefault();
+
+  if (state.phase !== "revive") {
+    return;
+  }
+
+  const answer = elements.reviveAnswer.value.trim();
+
+  if (answer === "神了") {
+    revivePlayer();
+    return;
+  }
+
+  elements.reviveError.classList.remove("hidden");
+  endGame();
+}
+
+function revivePlayer() {
+  state.lives = 1;
+  state.lifeCooldown = CONFIG.player.lifeCooldown;
+  player.invincibleTimer = CONFIG.player.invincibleTime * 1.4;
+  state.bossProjectiles = [];
+  state.enemies = state.enemies.filter((enemy) => enemy.y < canvas.height * 0.65);
+  elements.reviveAnswer.value = "";
+  elements.reviveError.classList.add("hidden");
+  showFeedback("殷神神了！一条命复活！");
+  addShake(24, 7);
+  playSound("pickup");
+  state.lastFrameTime = null;
+  setPhase("playing");
 }
 
 function endGame() {
@@ -754,10 +1050,16 @@ function updateUI() {
   elements.bestScore.textContent = state.bestScore;
   elements.startBestScore.textContent = state.bestScore;
   elements.finalScore.textContent = state.score;
+  elements.finalRating.textContent = getScoreRating(state.score);
   elements.finalBestScore.textContent = Math.max(state.bestScore, state.score);
+  elements.clearScore.textContent = state.score;
   elements.powerupStatus.textContent = getPowerupStatus();
   elements.stageLabel.textContent = getStageLabel();
-  elements.pauseBtn.disabled = state.phase === "ready" || state.phase === "gameover";
+  elements.pauseBtn.disabled =
+    state.phase === "ready" ||
+    state.phase === "revive" ||
+    state.phase === "clear" ||
+    state.phase === "gameover";
   elements.pauseBtn.textContent = state.phase === "paused" ? "继续" : "暂停";
   updateMusicButton();
   updateDebugPanel();
@@ -766,26 +1068,50 @@ function updateUI() {
 function updatePanels() {
   elements.startPanel.classList.toggle("hidden", state.phase !== "ready");
   elements.pausePanel.classList.toggle("hidden", state.phase !== "paused");
+  elements.revivePanel.classList.toggle("hidden", state.phase !== "revive");
+  elements.clearPanel.classList.toggle("hidden", state.phase !== "clear");
   elements.gameOverPanel.classList.toggle("hidden", state.phase !== "gameover");
 }
 
+function getScoreRating(score) {
+  if (score >= 300) {
+    return "小学博士";
+  }
+
+  if (score >= 210) {
+    return "清北";
+  }
+
+  if (score >= 180) {
+    return "985";
+  }
+
+  if (score >= 150) {
+    return "211";
+  }
+
+  if (score >= 120) {
+    return "双非";
+  }
+
+  if (score >= 90) {
+    return "大专";
+  }
+
+  if (score >= 30) {
+    return "职高";
+  }
+
+  return "中专";
+}
+
 function getPowerupStatus() {
-  const active = [];
-
-  if (state.powerupTimers.big > 0) {
-    active.push(`大子弹 ${Math.ceil(state.powerupTimers.big / 60)}s`);
-  }
-
-  if (state.powerupTimers.double > 0) {
-    active.push(`双发 ${Math.ceil(state.powerupTimers.double / 60)}s`);
-  }
-
-  return active.length ? active.join(" / ") : "无";
+  return `弹道 ${state.weapon.lanes}/${CONFIG.bullet.maxLanes} / 子弹 Lv.${state.weapon.bulletLevel}/${CONFIG.bullet.maxLevel}`;
 }
 
 function getStageLabel() {
   if (state.boss) {
-    return "Boss";
+    return state.boss.name;
   }
 
   if (state.score >= state.nextBossScore - 8) {
@@ -813,7 +1139,8 @@ function updateDebugPanel() {
   elements.debugPanel.innerHTML = [
     "DEBUG",
     "1 加10分 / 2 厚敌 / 3 漂敌",
-    "B Boss / P 道具 / C 碰撞框"
+    "4 切Boss / B Boss / P 道具",
+    "K 击败Boss / R 复活题 / C 碰撞框"
   ].join("<br>");
 }
 
@@ -932,7 +1259,9 @@ function drawGame() {
   drawPlayer();
   state.bullets.forEach(drawBullet);
   state.enemies.forEach(drawEnemy);
+  state.bossProjectiles.forEach(drawBossProjectile);
   drawBoss();
+  drawBossIntro();
   drawParticles();
   drawFloatingTexts();
 
@@ -993,20 +1322,23 @@ function drawPlayer() {
   ctx.fillStyle = "#e0f2fe";
   ctx.fillRect(-4, -8, 8, 24);
 
-  if (state.powerupTimers.double > 0) {
+  if (state.weapon.lanes > 1) {
     ctx.fillStyle = "#22c55e";
-    ctx.fillRect(-18, 12, 7, 16);
-    ctx.fillRect(11, 12, 7, 16);
+    getLaneOffsets(getBulletStats().width)
+      .filter((offset) => offset !== 0)
+      .forEach((offset) => {
+        ctx.fillRect(offset - 3, 12, 6, 16);
+      });
   }
 
   ctx.restore();
 }
 
 function drawBullet(bullet) {
-  ctx.fillStyle = bullet.big ? "#fde047" : "#facc15";
+  ctx.fillStyle = bullet.level > 0 ? "#fde047" : "#facc15";
   ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
 
-  if (bullet.big) {
+  if (bullet.level > 0) {
     ctx.globalAlpha = 0.35;
     ctx.fillStyle = "#fef9c3";
     ctx.fillRect(bullet.x - 2, bullet.y + 4, bullet.width + 4, bullet.height - 8);
@@ -1070,11 +1402,11 @@ function drawBoss() {
   ctx.save();
   ctx.translate(boss.x + boss.width / 2, boss.y + boss.height / 2);
 
-  ctx.fillStyle = boss.hitFlash > 0 ? "#fde68a" : "#4c1d95";
+  ctx.fillStyle = boss.hitFlash > 0 ? "#fde68a" : boss.color;
   roundedRect(-boss.width / 2, -boss.height / 2, boss.width, boss.height, 18);
   ctx.fill();
 
-  ctx.fillStyle = "#fbbf24";
+  ctx.fillStyle = boss.accent;
   ctx.fillRect(-boss.width / 2 + 14, -boss.height / 2 + 16, boss.width - 28, 12);
 
   ctx.fillStyle = "#ffffff";
@@ -1083,10 +1415,74 @@ function drawBoss() {
   ctx.fillText("BOSS", 0, 8);
 
   ctx.font = "bold 13px Arial, Microsoft YaHei";
-  ctx.fillText("张老师的跑步机", 0, 30);
+  ctx.fillText(boss.name, 0, 30);
   ctx.restore();
 
   drawMiniHealthBar(54, 18, canvas.width - 108, 10, boss.hp / boss.maxHp, "#ef4444");
+}
+
+function drawBossProjectile(projectile) {
+  ctx.save();
+  ctx.translate(projectile.x + projectile.width / 2, projectile.y + projectile.height / 2);
+  ctx.rotate(projectile.spin);
+  ctx.fillStyle = projectile.color;
+
+  if (projectile.label === "泡") {
+    ctx.globalAlpha = 0.78;
+    ctx.beginPath();
+    ctx.arc(0, 0, projectile.width / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  } else {
+    roundedRect(-projectile.width / 2, -projectile.height / 2, projectile.width, projectile.height, 5);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "bold 12px Arial, Microsoft YaHei";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(projectile.label, 0, 1);
+  ctx.restore();
+}
+
+function drawBossIntro() {
+  if (state.bossIntro.timer <= 0 || !state.boss) {
+    return;
+  }
+
+  const boss = state.boss;
+  const progress = 1 - state.bossIntro.timer / (95 + (Math.min(boss.level, 4) - 1) * 20);
+  const cx = boss.x + boss.width / 2;
+  const cy = boss.y + boss.height / 2;
+  const rings = Math.min(4, boss.level);
+
+  ctx.save();
+  ctx.globalAlpha = clamp(1 - progress, 0.12, 0.75);
+  ctx.strokeStyle = state.bossIntro.color;
+  ctx.lineWidth = 3;
+
+  for (let index = 0; index < rings; index += 1) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, 42 + progress * (86 + index * 28), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  if (boss.level >= 3) {
+    ctx.fillStyle = state.bossIntro.color;
+    ctx.globalAlpha = clamp(0.24 - progress * 0.16, 0.04, 0.24);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  ctx.globalAlpha = clamp(1 - progress * 0.8, 0.2, 1);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 22px Arial, Microsoft YaHei";
+  ctx.textAlign = "center";
+  ctx.fillText(`第 ${boss.level} 题：${boss.name}`, canvas.width / 2, 116);
+  ctx.restore();
 }
 
 function drawPowerups() {
@@ -1105,7 +1501,7 @@ function drawPowerups() {
     ctx.font = "bold 15px Arial, Microsoft YaHei";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(powerup.type === "big" ? "大" : "双", 0, 1);
+    ctx.fillText(powerup.type === "big" ? "大" : "道", 0, 1);
     ctx.restore();
   });
 }
@@ -1148,6 +1544,8 @@ function drawHitboxes() {
 
   ctx.strokeStyle = "#93c5fd";
   state.powerups.forEach(strokeBox);
+  ctx.strokeStyle = "#f97316";
+  state.bossProjectiles.forEach(strokeBox);
   ctx.restore();
 }
 
@@ -1286,9 +1684,18 @@ function handleDebugKey(event) {
     state.enemies.push(createEnemy("drift"));
   }
 
+  if (event.code === "Digit4") {
+    state.bossIndex = (state.bossIndex + 1) % CONFIG.bossTypes.length;
+    showFeedback(`下个 Boss：${CONFIG.bossTypes[state.bossIndex].name}`);
+  }
+
   if (event.code === "KeyB") {
     state.score = Math.max(state.score, state.nextBossScore);
     spawnBoss();
+  }
+
+  if (event.code === "KeyK" && state.boss) {
+    defeatBoss();
   }
 
   if (event.code === "KeyP") {
@@ -1297,6 +1704,11 @@ function handleDebugKey(event) {
 
   if (event.code === "KeyC") {
     state.showHitboxes = !state.showHitboxes;
+  }
+
+  if (event.code === "KeyR") {
+    state.lives = 1;
+    loseLife("调试复活题");
   }
 }
 
@@ -1321,6 +1733,9 @@ elements.startBtn.addEventListener("click", startGame);
 elements.restartBtn.addEventListener("click", startGame);
 elements.resumeBtn.addEventListener("click", togglePause);
 elements.pauseBtn.addEventListener("click", togglePause);
+elements.reviveForm.addEventListener("submit", submitReviveAnswer);
+elements.continueChallengeBtn.addEventListener("click", continueChallenge);
+elements.finishGameBtn.addEventListener("click", finishGame);
 
 elements.musicBtn.addEventListener("click", async () => {
   if (elements.bgm.paused) {

@@ -202,6 +202,49 @@ canvas {
   background: #15803d;
 }
 
+.overlay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.overlay button.secondary-btn {
+  background: #475569;
+}
+
+.overlay button.secondary-btn:hover {
+  background: #334155;
+}
+
+.revive-form {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  width: min(100%, 320px);
+}
+
+.revive-form input {
+  min-width: 0;
+  flex: 1;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.revive-form input:focus {
+  border-color: #facc15;
+  outline: none;
+}
+
+.revive-error {
+  color: #fecaca;
+  font-weight: 700;
+}
+
 .status-row {
   display: flex;
   justify-content: space-between;
