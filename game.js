@@ -112,6 +112,13 @@ const CONFIG = {
     score: 15,
     attackInterval: 74
   },
+  limits: {
+    bullets: 90,
+    enemies: 36,
+    bossProjectiles: 90,
+    particles: 160,
+    floatingTexts: 32
+  },
   bossTypes: [
     {
       name: "张老师的跑步机",
@@ -371,6 +378,7 @@ function updateGame(speedScale) {
   updatePowerups(speedScale);
   updateEffects(speedScale);
   checkCollisions();
+  enforceObjectLimits();
   updateUI();
 }
 
@@ -738,6 +746,20 @@ function updateEffects(speedScale) {
   }
 }
 
+function enforceObjectLimits() {
+  trimFromStart(state.bullets, CONFIG.limits.bullets);
+  trimFromStart(state.enemies, CONFIG.limits.enemies);
+  trimFromStart(state.bossProjectiles, CONFIG.limits.bossProjectiles);
+  trimFromStart(state.particles, CONFIG.limits.particles);
+  trimFromStart(state.floatingTexts, CONFIG.limits.floatingTexts);
+}
+
+function trimFromStart(items, maxLength) {
+  if (items.length > maxLength) {
+    items.splice(0, items.length - maxLength);
+  }
+}
+
 function checkCollisions() {
   checkEnemyCollisions();
   checkBossCollisions();
@@ -1017,6 +1039,7 @@ function submitReviveAnswer(event) {
   }
 
   elements.reviveError.classList.remove("hidden");
+  elements.reviveAnswer.blur();
   endGame();
 }
 
@@ -1024,15 +1047,39 @@ function revivePlayer() {
   state.lives = 1;
   state.lifeCooldown = CONFIG.player.lifeCooldown;
   player.invincibleTimer = CONFIG.player.invincibleTime * 1.4;
-  state.bossProjectiles = [];
-  state.enemies = state.enemies.filter((enemy) => enemy.y < canvas.height * 0.65);
+  clearRevivePressure();
   elements.reviveAnswer.value = "";
+  elements.reviveAnswer.blur();
   elements.reviveError.classList.add("hidden");
   showFeedback("殷神神了！一条命复活！");
-  addShake(24, 7);
   playSound("pickup");
   state.lastFrameTime = null;
   setPhase("playing");
+}
+
+function clearRevivePressure() {
+  const activeBoss = state.boss;
+
+  player.x = canvas.width / 2 - player.width / 2;
+  state.bullets = [];
+  state.powerups = [];
+  state.bossProjectiles = [];
+  state.particles = [];
+  state.floatingTexts = [];
+  state.enemies = state.enemies.filter((enemy) => enemy.y < canvas.height * 0.38);
+  state.shootCooldown = 0;
+  state.enemyTimer = 0;
+  state.shake.time = 0;
+  state.shake.strength = 0;
+  // Keep the active boss alive; revival only clears pressure around the player.
+  state.boss = activeBoss;
+  elements.canvasWrap.style.transform = "";
+
+  if (state.boss) {
+    state.boss.attackTimer = 0;
+    state.boss.introTimer = Math.max(state.boss.introTimer, 45);
+    state.bossIntro.timer = Math.max(state.bossIntro.timer, 45);
+  }
 }
 
 function endGame() {
